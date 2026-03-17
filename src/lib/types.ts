@@ -41,6 +41,14 @@ export interface GraphEdge {
   is_vertical: boolean;
 }
 
+export interface FloorMap {
+  id: string;
+  floor: FloorType;
+  block: string;
+  image_url: string | null;
+  uploaded_at: string;
+}
+
 export interface NavigationStep {
   instruction: string;
   floor: FloorType;

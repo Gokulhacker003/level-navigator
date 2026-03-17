@@ -5,20 +5,22 @@ import { NavigationSidebar } from '@/components/NavigationSidebar';
 import { useNavigationData } from '@/hooks/useNavigationData';
 import { navigationEngine } from '@/lib/navigation-engine';
 import { FloorType, NavigationResult, NavigationStep } from '@/lib/types';
-import { getRoomNodeId } from '@/lib/seed-data';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
-import { Settings, BookOpen } from 'lucide-react';
+import { BookOpen } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useDatabaseConnection } from '@/hooks/useDatabaseConnection';
+import { getRoomNodeId } from '@/lib/seed-data';
 
 const Index = () => {
-  const { rooms, waypoints, edges, loading, usingSeedData } = useNavigationData();
+  const { rooms, waypoints, loading, usingSeedData, getFloorMapUrl } = useNavigationData();
   const [currentFloor, setCurrentFloor] = useState<FloorType>('G');
   const [selectedSource, setSelectedSource] = useState<string | null>(null);
   const [selectedDest, setSelectedDest] = useState<string | null>(null);
   const [navigationResult, setNavigationResult] = useState<NavigationResult | null>(null);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [hoveredRoom, setHoveredRoom] = useState<string | null>(null);
+  const { status: dbStatus } = useDatabaseConnection();
   const { toast } = useToast();
 
   const handleRoomClick = useCallback((roomNumber: string, floor: FloorType) => {
@@ -101,6 +103,17 @@ const Index = () => {
           />
 
           <div className="flex items-center gap-2">
+            <span
+              className={`text-[10px] px-2 py-1 rounded-full border ${
+                dbStatus === 'connected'
+                  ? 'bg-emerald-500/10 text-emerald-700 border-emerald-500/30'
+                  : dbStatus === 'disconnected'
+                    ? 'bg-destructive/10 text-destructive border-destructive/30'
+                    : 'bg-muted text-muted-foreground border-border'
+              }`}
+            >
+              DB: {dbStatus === 'connected' ? 'Connected' : dbStatus === 'disconnected' ? 'Disconnected' : 'Checking...'}
+            </span>
             {usingSeedData && (
               <span className="text-[10px] bg-accent/20 text-accent px-2 py-1 rounded-full">Demo Data</span>
             )}
@@ -110,12 +123,6 @@ const Index = () => {
                 Docs
               </Button>
             </Link>
-            <Link to="/admin">
-              <Button variant="ghost" size="sm" className="gap-1 text-xs">
-                <Settings className="h-3 w-3" />
-                Admin
-              </Button>
-            </Link>
           </div>
         </div>
 
@@ -123,6 +130,7 @@ const Index = () => {
         <div className="flex-1 p-3">
           <FloorMap
             floor={currentFloor}
+            floorMapUrl={getFloorMapUrl(currentFloor)}
             rooms={rooms}
             waypoints={waypoints}
             navigationResult={navigationResult}

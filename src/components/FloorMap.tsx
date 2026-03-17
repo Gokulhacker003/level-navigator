@@ -4,6 +4,7 @@ import { navigationEngine } from '@/lib/navigation-engine';
 
 interface FloorMapProps {
   floor: FloorType;
+  floorMapUrl: string | null;
   rooms: Room[];
   waypoints: Waypoint[];
   navigationResult: NavigationResult | null;
@@ -17,6 +18,7 @@ interface FloorMapProps {
 
 export const FloorMap: React.FC<FloorMapProps> = ({
   floor,
+  floorMapUrl,
   rooms,
   waypoints,
   navigationResult,
@@ -28,12 +30,33 @@ export const FloorMap: React.FC<FloorMapProps> = ({
   onHoverRoom,
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
+  const [mapSize, setMapSize] = useState({ w: 800, h: 500 });
   const [viewBox, setViewBox] = useState({ x: 0, y: 0, w: 800, h: 500 });
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
 
   const floorRooms = rooms.filter(r => r.floor === floor);
   const floorWaypoints = waypoints.filter(w => w.floor === floor);
+
+  useEffect(() => {
+    if (!floorMapUrl) {
+      setMapSize({ w: 800, h: 500 });
+      setViewBox({ x: 0, y: 0, w: 800, h: 500 });
+      return;
+    }
+
+    const img = new Image();
+    img.onload = () => {
+      const nextSize = { w: Math.max(300, img.naturalWidth), h: Math.max(200, img.naturalHeight) };
+      setMapSize(nextSize);
+      setViewBox({ x: 0, y: 0, w: nextSize.w, h: nextSize.h });
+    };
+    img.onerror = () => {
+      setMapSize({ w: 800, h: 500 });
+      setViewBox({ x: 0, y: 0, w: 800, h: 500 });
+    };
+    img.src = floorMapUrl;
+  }, [floor, floorMapUrl]);
 
   // Get path segments for this floor
   const pathSegments: { x1: number; y1: number; x2: number; y2: number; isFloorChange: boolean }[] = [];
@@ -55,7 +78,6 @@ export const FloorMap: React.FC<FloorMapProps> = ({
   }
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault();
     const scale = e.deltaY > 0 ? 1.1 : 0.9;
     setViewBox(v => ({
       x: v.x,
@@ -64,6 +86,19 @@ export const FloorMap: React.FC<FloorMapProps> = ({
       h: Math.max(125, Math.min(1000, v.h * scale)),
     }));
   }, []);
+
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return;
+
+    const handleNativeWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      handleWheel(event as unknown as React.WheelEvent);
+    };
+
+    svg.addEventListener('wheel', handleNativeWheel, { passive: false });
+    return () => svg.removeEventListener('wheel', handleNativeWheel);
+  }, [handleWheel]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (e.button === 0) {
@@ -108,7 +143,6 @@ export const FloorMap: React.FC<FloorMapProps> = ({
       ref={svgRef}
       className="w-full h-full bg-card rounded-lg cursor-grab active:cursor-grabbing"
       viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.w} ${viewBox.h}`}
-      onWheel={handleWheel}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
@@ -120,10 +154,24 @@ export const FloorMap: React.FC<FloorMapProps> = ({
           <path d="M 50 0 L 0 0 0 50" fill="none" className="stroke-border" strokeWidth="0.5" opacity="0.3" />
         </pattern>
       </defs>
-      <rect x={viewBox.x} y={viewBox.y} width={viewBox.w} height={viewBox.h} fill="url(#grid)" />
 
-      {/* Building outline */}
-      <rect x="30" y="150" width="730" height="330" rx="8" fill="none" className="stroke-border" strokeWidth="2" strokeDasharray="8 4" />
+      {floorMapUrl ? (
+        <image
+          href={floorMapUrl}
+          x={0}
+          y={0}
+          width={mapSize.w}
+          height={mapSize.h}
+          preserveAspectRatio="none"
+        />
+      ) : (
+        <>
+          <rect x={viewBox.x} y={viewBox.y} width={viewBox.w} height={viewBox.h} fill="url(#grid)" />
+
+          {/* Building outline */}
+          <rect x="30" y="150" width="730" height="330" rx="8" fill="none" className="stroke-border" strokeWidth="2" strokeDasharray="8 4" />
+        </>
+      )}
 
       {/* Corridor lines */}
       {floorWaypoints.filter(w => w.type === 'corridor').length > 1 && (

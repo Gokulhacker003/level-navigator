@@ -17,26 +17,26 @@ export type Database = {
       floor_maps: {
         Row: {
           block: string
-          blueprint_url: string | null
-          created_at: string
           floor: Database["public"]["Enums"]["floor_type"]
           id: string
+          image_url: string | null
+          uploaded_at: string
           updated_at: string
         }
         Insert: {
           block?: string
-          blueprint_url?: string | null
-          created_at?: string
           floor: Database["public"]["Enums"]["floor_type"]
           id?: string
+          image_url?: string | null
+          uploaded_at?: string
           updated_at?: string
         }
         Update: {
           block?: string
-          blueprint_url?: string | null
-          created_at?: string
           floor?: Database["public"]["Enums"]["floor_type"]
           id?: string
+          image_url?: string | null
+          uploaded_at?: string
           updated_at?: string
         }
         Relationships: []

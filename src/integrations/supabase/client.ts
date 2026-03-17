@@ -2,8 +2,47 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+const normalizeEnvValue = (value: string | undefined) => (value ?? '').trim().replace(/^['"]|['"]$/g, '');
+
+const toHttpSupabaseUrl = (value: string) => {
+  if (!value) return null;
+
+  try {
+    const parsed = new URL(value);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return null;
+    }
+
+    return `${parsed.protocol}//${parsed.host}`.replace(/\/+$/, '');
+  } catch {
+    return null;
+  }
+};
+
+const rawSupabaseUrl = normalizeEnvValue(import.meta.env.VITE_SUPABASE_URL);
+const rawProjectId = normalizeEnvValue(import.meta.env.VITE_SUPABASE_PROJECT_ID);
+const rawPublishableKey = normalizeEnvValue(import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY);
+const rawAnonKey = normalizeEnvValue(import.meta.env.VITE_SUPABASE_ANON_KEY);
+
+const SUPABASE_URL =
+  toHttpSupabaseUrl(rawSupabaseUrl)
+  ?? toHttpSupabaseUrl(rawProjectId ? `https://${rawProjectId}.supabase.co` : '')
+  ?? '';
+const SUPABASE_PUBLISHABLE_KEY = rawPublishableKey || rawAnonKey;
+
+if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
+  throw new Error('Missing Supabase configuration. Check VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY in .env');
+}
+
+try {
+  // Validate URL early so malformed env values fail fast in development.
+  const parsed = new URL(SUPABASE_URL);
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error('Supabase URL must use HTTP or HTTPS');
+  }
+} catch {
+  throw new Error(`Invalid Supabase URL. Expected https://<project-ref>.supabase.co but got: ${rawSupabaseUrl || '(empty)'}`);
+}
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
