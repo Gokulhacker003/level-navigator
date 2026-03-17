@@ -14,16 +14,200 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      floor_maps: {
+        Row: {
+          block: string
+          blueprint_url: string | null
+          created_at: string
+          floor: Database["public"]["Enums"]["floor_type"]
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          block?: string
+          blueprint_url?: string | null
+          created_at?: string
+          floor: Database["public"]["Enums"]["floor_type"]
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          block?: string
+          blueprint_url?: string | null
+          created_at?: string
+          floor?: Database["public"]["Enums"]["floor_type"]
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      graph_edges: {
+        Row: {
+          created_at: string
+          distance: number
+          floor: Database["public"]["Enums"]["floor_type"] | null
+          from_node: string
+          id: string
+          is_vertical: boolean
+          to_node: string
+        }
+        Insert: {
+          created_at?: string
+          distance: number
+          floor?: Database["public"]["Enums"]["floor_type"] | null
+          from_node: string
+          id?: string
+          is_vertical?: boolean
+          to_node: string
+        }
+        Update: {
+          created_at?: string
+          distance?: number
+          floor?: Database["public"]["Enums"]["floor_type"] | null
+          from_node?: string
+          id?: string
+          is_vertical?: boolean
+          to_node?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          display_name: string | null
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      rooms: {
+        Row: {
+          block: string
+          created_at: string
+          floor: Database["public"]["Enums"]["floor_type"]
+          height: number
+          id: string
+          room_name: string
+          room_number: string
+          updated_at: string
+          width: number
+          x: number
+          y: number
+        }
+        Insert: {
+          block?: string
+          created_at?: string
+          floor: Database["public"]["Enums"]["floor_type"]
+          height?: number
+          id?: string
+          room_name: string
+          room_number: string
+          updated_at?: string
+          width?: number
+          x: number
+          y: number
+        }
+        Update: {
+          block?: string
+          created_at?: string
+          floor?: Database["public"]["Enums"]["floor_type"]
+          height?: number
+          id?: string
+          room_name?: string
+          room_number?: string
+          updated_at?: string
+          width?: number
+          x?: number
+          y?: number
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      waypoints: {
+        Row: {
+          block: string
+          created_at: string
+          floor: Database["public"]["Enums"]["floor_type"]
+          id: string
+          name: string
+          type: Database["public"]["Enums"]["waypoint_type"]
+          x: number
+          y: number
+        }
+        Insert: {
+          block?: string
+          created_at?: string
+          floor: Database["public"]["Enums"]["floor_type"]
+          id?: string
+          name: string
+          type: Database["public"]["Enums"]["waypoint_type"]
+          x: number
+          y: number
+        }
+        Update: {
+          block?: string
+          created_at?: string
+          floor?: Database["public"]["Enums"]["floor_type"]
+          id?: string
+          name?: string
+          type?: Database["public"]["Enums"]["waypoint_type"]
+          x?: number
+          y?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "user"
+      floor_type: "G" | "F" | "S" | "T"
+      waypoint_type: "room" | "corridor" | "stairs" | "lift" | "entrance"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +334,10 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "user"],
+      floor_type: ["G", "F", "S", "T"],
+      waypoint_type: ["room", "corridor", "stairs", "lift", "entrance"],
+    },
   },
 } as const
