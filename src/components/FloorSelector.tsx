@@ -1,19 +1,16 @@
 import React from 'react';
-import { FloorType, FLOOR_LABELS, FLOOR_ORDER } from '@/lib/types';
+import { FloorType, FLOOR_ORDER } from '@/lib/types';
 import { Button } from '@/components/ui/button';
-import { RotateCcw } from 'lucide-react';
 
 interface FloorSelectorProps {
   currentFloor: FloorType;
   onFloorChange: (floor: FloorType) => void;
-  onReset: () => void;
   activeFloors?: FloorType[];
 }
 
 export const FloorSelector: React.FC<FloorSelectorProps> = ({
   currentFloor,
   onFloorChange,
-  onReset,
   activeFloors,
 }) => {
   return (
@@ -36,11 +33,6 @@ export const FloorSelector: React.FC<FloorSelectorProps> = ({
           </Button>
         );
       })}
-      <div className="w-px h-6 bg-border mx-1" />
-      <Button variant="ghost" size="sm" onClick={onReset} className="h-8 gap-1 text-xs">
-        <RotateCcw className="h-3 w-3" />
-        Reset
-      </Button>
     </div>
   );
 };

@@ -1,9 +1,16 @@
 import React, { useState, useMemo } from 'react';
-import { Room, FloorType, NavigationResult, NavigationStep, FLOOR_LABELS } from '@/lib/types';
+import { Room, NavigationResult, NavigationStep, FLOOR_LABELS } from '@/lib/types';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Search, MapPin, Navigation, ArrowRight, Footprints, Building2 } from 'lucide-react';
+import { Search, MapPin, Navigation, ArrowRight, Footprints, Building2, RotateCcw } from 'lucide-react';
 import { getRoomNodeId } from '@/lib/seed-data';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface NavigationSidebarProps {
   rooms: Room[];
@@ -12,8 +19,9 @@ interface NavigationSidebarProps {
   onSelectSource: (nodeId: string | null) => void;
   onSelectDest: (nodeId: string | null) => void;
   onNavigate: () => void;
+  onClearRoute: () => void;
   navigationResult: NavigationResult | null;
-  onStepClick: (step: NavigationStep) => void;
+  onStepClick: (step: NavigationStep, index: number) => void;
   currentStepIndex: number;
 }
 
@@ -24,6 +32,7 @@ export const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
   onSelectSource,
   onSelectDest,
   onNavigate,
+  onClearRoute,
   navigationResult,
   onStepClick,
   currentStepIndex,
@@ -43,6 +52,12 @@ export const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
     const room = rooms.find(r => getRoomNodeId(r.room_number, r.floor) === nodeId);
     return room ? `${room.room_name} (${room.room_number})` : nodeId;
   };
+
+  const roomOptions = useMemo(() => {
+    return [...rooms].sort((a, b) => a.room_name.localeCompare(b.room_name));
+  }, [rooms]);
+
+  const NONE = '__none__';
 
   return (
     <div className="w-80 bg-sidebar text-sidebar-foreground flex flex-col h-full overflow-hidden border-r border-sidebar-border">
@@ -96,23 +111,53 @@ export const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
       <div className="p-4 space-y-3 border-b border-sidebar-border">
         <div className="space-y-1">
           <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Source</label>
-          <div className="flex items-center gap-2 bg-sidebar-accent rounded-md px-3 py-2 text-sm">
+          <div className="flex items-center gap-2">
             <MapPin className="h-4 w-4 text-primary shrink-0" />
-            <span className="truncate">{getNodeLabel(selectedSource)}</span>
-            {selectedSource && (
-              <button onClick={() => onSelectSource(null)} className="ml-auto text-xs text-muted-foreground hover:text-foreground">✕</button>
-            )}
+            <Select
+              value={selectedSource ?? NONE}
+              onValueChange={(value) => onSelectSource(value === NONE ? null : value)}
+            >
+              <SelectTrigger className="h-9 bg-sidebar-accent border-sidebar-border text-sm">
+                <SelectValue placeholder="Select source room" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NONE}>None</SelectItem>
+                {roomOptions.map((room) => {
+                  const nodeId = getRoomNodeId(room.room_number, room.floor);
+                  return (
+                    <SelectItem key={nodeId} value={nodeId}>
+                      {room.room_name} ({room.room_number}) - {FLOOR_LABELS[room.floor]}
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
         <div className="space-y-1">
           <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Destination</label>
-          <div className="flex items-center gap-2 bg-sidebar-accent rounded-md px-3 py-2 text-sm">
+          <div className="flex items-center gap-2">
             <Navigation className="h-4 w-4 text-nav-selected shrink-0" />
-            <span className="truncate">{getNodeLabel(selectedDest)}</span>
-            {selectedDest && (
-              <button onClick={() => onSelectDest(null)} className="ml-auto text-xs text-muted-foreground hover:text-foreground">✕</button>
-            )}
+            <Select
+              value={selectedDest ?? NONE}
+              onValueChange={(value) => onSelectDest(value === NONE ? null : value)}
+            >
+              <SelectTrigger className="h-9 bg-sidebar-accent border-sidebar-border text-sm">
+                <SelectValue placeholder="Select destination room" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NONE}>None</SelectItem>
+                {roomOptions.map((room) => {
+                  const nodeId = getRoomNodeId(room.room_number, room.floor);
+                  return (
+                    <SelectItem key={nodeId} value={nodeId}>
+                      {room.room_name} ({room.room_number}) - {FLOOR_LABELS[room.floor]}
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
@@ -123,7 +168,12 @@ export const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
           size="sm"
         >
           <Footprints className="h-4 w-4" />
-          Navigate
+          Find Route
+        </Button>
+
+        <Button onClick={onClearRoute} variant="outline" className="w-full gap-2" size="sm">
+          <RotateCcw className="h-4 w-4" />
+          Clear Route
         </Button>
       </div>
 
@@ -143,7 +193,7 @@ export const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
             {navigationResult.steps.map((step, i) => (
               <button
                 key={i}
-                onClick={() => onStepClick(step)}
+                onClick={() => onStepClick(step, i)}
                 className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
                   i === currentStepIndex
                     ? 'bg-sidebar-primary/20 text-sidebar-primary-foreground'
@@ -161,7 +211,7 @@ export const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
                     {step.isFloorChange && (
                       <span className="text-[10px] text-nav-stairs font-medium flex items-center gap-1 mt-0.5">
                         <ArrowRight className="h-3 w-3" />
-                        {FLOOR_LABELS[step.floor]}
+                        Continue on {FLOOR_LABELS[step.floor]}
                       </span>
                     )}
                   </div>
@@ -177,8 +227,8 @@ export const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
         <div className="flex-1 flex items-center justify-center p-6">
           <div className="text-center text-muted-foreground">
             <MapPin className="h-8 w-8 mx-auto mb-2 opacity-30" />
-            <p className="text-xs">Search for a room or click on the map to start navigating</p>
-            <p className="text-[10px] mt-1 opacity-60">Double-click → set source · Click → set destination</p>
+            <p className="text-xs">Choose source and destination, then tap Find Route</p>
+            <p className="text-[10px] mt-1 opacity-60">The map will show only your route and important points</p>
           </div>
         </div>
       )}

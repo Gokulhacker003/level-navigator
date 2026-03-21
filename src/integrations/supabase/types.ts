@@ -14,9 +14,35 @@ export type Database = {
   }
   public: {
     Tables: {
-      floor_maps: {
+      campus_waypoints: {
         Row: {
           block: string
+          created_at: string
+          id: number
+          name: string
+          x: number
+          y: number
+        }
+        Insert: {
+          block?: string
+          created_at?: string
+          id?: number
+          name: string
+          x: number
+          y: number
+        }
+        Update: {
+          block?: string
+          created_at?: string
+          id?: number
+          name?: string
+          x?: number
+          y?: number
+        }
+        Relationships: []
+      }
+      floor_maps: {
+        Row: {
           floor: Database["public"]["Enums"]["floor_type"]
           id: string
           image_url: string | null
@@ -24,7 +50,6 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          block?: string
           floor: Database["public"]["Enums"]["floor_type"]
           id?: string
           image_url?: string | null
@@ -32,7 +57,6 @@ export type Database = {
           updated_at?: string
         }
         Update: {
-          block?: string
           floor?: Database["public"]["Enums"]["floor_type"]
           id?: string
           image_url?: string | null
@@ -47,8 +71,10 @@ export type Database = {
           distance: number
           floor: Database["public"]["Enums"]["floor_type"] | null
           from_node: string
+          from_waypoint_id: string | null
           id: string
           is_vertical: boolean
+          to_waypoint_id: string | null
           to_node: string
         }
         Insert: {
@@ -56,8 +82,10 @@ export type Database = {
           distance: number
           floor?: Database["public"]["Enums"]["floor_type"] | null
           from_node: string
+          from_waypoint_id?: string | null
           id?: string
           is_vertical?: boolean
+          to_waypoint_id?: string | null
           to_node: string
         }
         Update: {
@@ -65,8 +93,10 @@ export type Database = {
           distance?: number
           floor?: Database["public"]["Enums"]["floor_type"] | null
           from_node?: string
+          from_waypoint_id?: string | null
           id?: string
           is_vertical?: boolean
+          to_waypoint_id?: string | null
           to_node?: string
         }
         Relationships: []
@@ -207,7 +237,7 @@ export type Database = {
     Enums: {
       app_role: "admin" | "user"
       floor_type: "G" | "F" | "S" | "T"
-      waypoint_type: "room" | "corridor" | "stairs" | "lift" | "entrance"
+      waypoint_type: "room" | "corridor" | "stairs" | "lift" | "entrance" | "block"
     }
     CompositeTypes: {
       [_ in never]: never

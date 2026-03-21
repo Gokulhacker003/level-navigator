@@ -6,6 +6,11 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import Index from "./pages/Index.tsx";
 import Documentation from "./pages/Documentation.tsx";
 import NotFound from "./pages/NotFound.tsx";
+import UserLogin from "./pages/UserLogin.tsx";
+import UserSignup from "./pages/UserSignup.tsx";
+import AdminLogin from "./pages/AdminLogin.tsx";
+import AdminPanel from "./pages/AdminPanel.tsx";
+import { ADMIN_LOGIN_PATH, ADMIN_PANEL_PATH } from "./lib/auth-routes";
 
 const queryClient = new QueryClient();
 
@@ -17,6 +22,10 @@ const App = () => (
       <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <Routes>
           <Route path="/" element={<Index />} />
+          <Route path="/login" element={<UserLogin />} />
+          <Route path="/signup" element={<UserSignup />} />
+          <Route path={ADMIN_LOGIN_PATH} element={<AdminLogin />} />
+          <Route path={ADMIN_PANEL_PATH} element={<AdminPanel />} />
           <Route path="/docs" element={<Documentation />} />
           <Route path="*" element={<NotFound />} />
         </Routes>

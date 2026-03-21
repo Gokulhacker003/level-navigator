@@ -10,32 +10,16 @@ import { Link } from 'react-router-dom';
 import { BookOpen } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useDatabaseConnection } from '@/hooks/useDatabaseConnection';
-import { getRoomNodeId } from '@/lib/seed-data';
 
 const Index = () => {
-  const { rooms, waypoints, loading, usingSeedData, getFloorMapUrl } = useNavigationData();
+  const { rooms, loading, getFloorMapUrl } = useNavigationData();
   const [currentFloor, setCurrentFloor] = useState<FloorType>('G');
   const [selectedSource, setSelectedSource] = useState<string | null>(null);
   const [selectedDest, setSelectedDest] = useState<string | null>(null);
   const [navigationResult, setNavigationResult] = useState<NavigationResult | null>(null);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
-  const [hoveredRoom, setHoveredRoom] = useState<string | null>(null);
   const { status: dbStatus } = useDatabaseConnection();
   const { toast } = useToast();
-
-  const handleRoomClick = useCallback((roomNumber: string, floor: FloorType) => {
-    const nodeId = getRoomNodeId(roomNumber, floor);
-    if (selectedSource) {
-      setSelectedDest(nodeId);
-    } else {
-      setSelectedDest(nodeId);
-    }
-  }, [selectedSource]);
-
-  const handleRoomDoubleClick = useCallback((roomNumber: string, floor: FloorType) => {
-    const nodeId = getRoomNodeId(roomNumber, floor);
-    setSelectedSource(nodeId);
-  }, []);
 
   const handleNavigate = useCallback(() => {
     if (!selectedSource || !selectedDest) return;
@@ -51,11 +35,10 @@ const Index = () => {
     }
   }, [selectedSource, selectedDest, toast]);
 
-  const handleStepClick = useCallback((step: NavigationStep) => {
+  const handleStepClick = useCallback((step: NavigationStep, index: number) => {
     setCurrentFloor(step.floor);
-    const idx = navigationResult?.steps.indexOf(step) ?? 0;
-    setCurrentStepIndex(idx);
-  }, [navigationResult]);
+    setCurrentStepIndex(index);
+  }, []);
 
   const handleReset = useCallback(() => {
     setSelectedSource(null);
@@ -86,6 +69,7 @@ const Index = () => {
         onSelectSource={setSelectedSource}
         onSelectDest={setSelectedDest}
         onNavigate={handleNavigate}
+        onClearRoute={handleReset}
         navigationResult={navigationResult}
         onStepClick={handleStepClick}
         currentStepIndex={currentStepIndex}
@@ -98,7 +82,6 @@ const Index = () => {
           <FloorSelector
             currentFloor={currentFloor}
             onFloorChange={setCurrentFloor}
-            onReset={handleReset}
             activeFloors={navigationResult?.floorsVisited}
           />
 
@@ -114,9 +97,16 @@ const Index = () => {
             >
               DB: {dbStatus === 'connected' ? 'Connected' : dbStatus === 'disconnected' ? 'Disconnected' : 'Checking...'}
             </span>
-            {usingSeedData && (
-              <span className="text-[10px] bg-accent/20 text-accent px-2 py-1 rounded-full">Demo Data</span>
-            )}
+            <Link to="/login">
+              <Button variant="outline" size="sm" className="text-xs">
+                User Login
+              </Button>
+            </Link>
+            <Link to="/signup">
+              <Button variant="default" size="sm" className="text-xs">
+                Sign Up
+              </Button>
+            </Link>
             <Link to="/docs">
               <Button variant="ghost" size="sm" className="gap-1 text-xs">
                 <BookOpen className="h-3 w-3" />
@@ -132,14 +122,9 @@ const Index = () => {
             floor={currentFloor}
             floorMapUrl={getFloorMapUrl(currentFloor)}
             rooms={rooms}
-            waypoints={waypoints}
             navigationResult={navigationResult}
             selectedSource={selectedSource}
             selectedDest={selectedDest}
-            onRoomClick={handleRoomClick}
-            onRoomDoubleClick={handleRoomDoubleClick}
-            hoveredRoom={hoveredRoom}
-            onHoverRoom={setHoveredRoom}
           />
         </div>
       </div>

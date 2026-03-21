@@ -1,5 +1,5 @@
 export type FloorType = 'G' | 'F' | 'S' | 'T';
-export type WaypointType = 'room' | 'corridor' | 'stairs' | 'lift' | 'entrance';
+export type WaypointType = 'room' | 'corridor' | 'stairs' | 'lift' | 'entrance' | 'block';
 
 export const FLOOR_LABELS: Record<FloorType, string> = {
   G: 'Ground Floor',
@@ -36,6 +36,8 @@ export interface GraphEdge {
   id: string;
   from_node: string;
   to_node: string;
+  from_waypoint_id?: string | null;
+  to_waypoint_id?: string | null;
   distance: number;
   floor: FloorType | null;
   is_vertical: boolean;
@@ -44,7 +46,6 @@ export interface GraphEdge {
 export interface FloorMap {
   id: string;
   floor: FloorType;
-  block: string;
   image_url: string | null;
   uploaded_at: string;
 }

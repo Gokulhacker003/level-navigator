@@ -87,3 +87,94 @@ SET x = EXCLUDED.x,
     y = EXCLUDED.y,
     type = EXCLUDED.type,
     block = EXCLUDED.block;
+
+-- Seed graph edges from the provided adjacency map.
+WITH graph_json AS (
+  SELECT $$
+  {
+    "Auditorium 2": { "Seminar Hall": 20, "Auditorium 1": 25 },
+    "Auditorium 1": { "Seminar Hall": 10, "Auditorium 2": 25 },
+    "Seminar Hall": { "Auditorium 1": 10, "Auditorium 2": 20, "D Block": 10 },
+    "Lab 1": { "D Block 2": 10, "C Block": 20, "Boys RestRoom": 10 },
+    "Lab 2": { "D Block 2": 10 },
+    "Lab 3": { "D Block": 20, "D Block 2": 10 },
+    "Lab 4": { "D Block": 10, "D Block 3": 10 },
+    "Lab 5": { "D Block 3": 10, "PT room": 10 },
+    "D Block": { "Lab 3": 10, "Lab 4": 15, "Seminar Hall": 10 },
+    "D Block 2": { "Lab 2": 10, "Lab 1": 10, "Lab 3": 20 },
+    "D Block 3": { "Lab 4": 10, "Lab 5": 10 },
+    "PT room": { "Lab 5": 10, "C Block 3": 10 },
+    "C Block": { "2nd AIDS 'A'": 10, "1st AIDS 'B'": 10, "OAT": 10 },
+    "C Block 2": { "AIDS Department": 10, "Lab 1": 10 },
+    "C Block 3": { "Green Room": 10, "PT room": 10, "Store Room": 10 },
+    "Store Room": { "C Block 3": 10, "Transport Office": 10 },
+    "Transport Office": { "Store Room": 10, "Middle Block 3": 10 },
+    "AIDS Department": { "2nd AIDS 'A'": 10, "C Block 2": 10 },
+    "2nd AIDS 'A'": { "AIDS Department": 10, "C Block": 10 },
+    "1st AIDS 'B'": { "Green Room": 10, "C Block": 10 },
+    "Green Room": { "1st AIDS 'B'": 10, "C Block 3": 10 },
+    "Boys RestRoom": { "Lab 1": 10, "Middle Block 2": 10 },
+    "Girls RestRoom": { "Middle Block 2": 10, "VIP Pantry": 10 },
+    "Middle Block": { "Middle Block 2": 10, "Middle Block 3": 10 },
+    "Middle Block 2": { "Middle Block": 10, "Girls RestRoom": 10, "Boys RestRoom": 10 },
+    "VIP Pantry": { "Girls RestRoom": 10, "VIP Waiting Area": 10 },
+    "VIP Waiting Area": { "VIP Pantry": 10, "B Block 2": 10, "OSSIS Hall": 10 },
+    "Meeting Room": { "B Block 2": 10, "Exam Cell": 10 },
+    "Exam Cell": { "Meeting Room": 10, "B Block": 10 },
+    "B Block": { "Exam Cell": 10, "Admin Office": 10, "A Block": 10 },
+    "B Block 2": { "VIP Waiting Area": 10, "Meeting Room": 10 },
+    "Admin Office": { "B Block": 10, "Falcon Hall": 10 },
+    "B Block 3": { "Admission Office": 10, "Falcon Hall": 10, "CDC": 10 },
+    "Falcon Hall": { "B Block 3": 10, "Admin Office": 10 },
+    "CDC": { "B Block 3": 10, "Harmony": 10 },
+    "Harmony": { "CDC": 10, "A Block 3": 10 },
+    "A Block": { "B Block": 10, "Reception": 10, "Master Board Room": 10 },
+    "A Block 2": { "OAK leaf": 10, "VIP Dining": 10 },
+    "A Block 3": { "Symphony": 10, "Harmony": 10, "Waiting Hall": 10 },
+    "Symphony": { "A Block 3": 10 },
+    "Waiting Hall": { "A Block 3": 10, "Reception": 10 },
+    "Reception": { "A Block": 10, "Waiting Hall": 10 },
+    "Master Board Room": { "A Block": 10, "OAK leaf": 10 },
+    "OAK leaf": { "Master Board Room": 10, "A Block 2": 10 },
+    "VIP Dining": { "A Block 2": 10, "Chairman Office": 10, "Pantry": 10 },
+    "Chairman Office": { "VIP Dining": 10, "Principle Office": 10 },
+    "Principle Office": { "Chairman Office": 10 },
+    "OAT": { "C Block": 10 },
+    "Pantry": { "VIP Dining": 10, "OSSIS Hall": 10 },
+    "OSSIS Hall": { "Pantry": 10, "VIP Waiting Area": 10 },
+    "Zig Zag Steps": { "Admission Office": 10, "Middle Block 3": 10 },
+    "Middle Block 3": { "Zig Zag Steps": 10, "Middle Block": 10, "Transport Office": 10 },
+    "Admission Office": { "Zig Zag Steps": 10, "B Block 3": 10 }
+  }
+  $$::jsonb AS g
+),
+raw_edges AS (
+  SELECT
+    from_node.key AS from_node,
+    to_node.key AS to_node,
+    (to_node.value)::REAL AS distance
+  FROM graph_json gj
+  CROSS JOIN LATERAL jsonb_each(gj.g) AS from_node(key, value)
+  CROSS JOIN LATERAL jsonb_each(from_node.value) AS to_node(key, value)
+),
+dedup_edges AS (
+  SELECT
+    LEAST(from_node, to_node) AS from_node,
+    GREATEST(from_node, to_node) AS to_node,
+    MIN(distance) AS distance
+  FROM raw_edges
+  GROUP BY 1, 2
+)
+INSERT INTO public.graph_edges (from_node, to_node, distance, floor, is_vertical)
+SELECT
+  de.from_node,
+  de.to_node,
+  de.distance,
+  'G'::public.floor_type,
+  FALSE
+FROM dedup_edges de
+ON CONFLICT (from_node, to_node) DO UPDATE
+SET
+  distance = EXCLUDED.distance,
+  floor = EXCLUDED.floor,
+  is_vertical = EXCLUDED.is_vertical;

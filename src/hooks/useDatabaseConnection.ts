@@ -7,20 +7,30 @@ export function useDatabaseConnection(pollIntervalMs = 20000) {
   const [status, setStatus] = useState<ConnectionState>('checking');
   const [lastCheckedAt, setLastCheckedAt] = useState<Date | null>(null);
   const mountedRef = useRef(true);
+  const schemaMissingRef = useRef(false);
 
   const checkConnection = useCallback(async () => {
-    if (!mountedRef.current) return;
+    if (!mountedRef.current || schemaMissingRef.current) return;
     setStatus(previous => (previous === 'connected' ? previous : 'checking'));
 
     try {
       // Use a lightweight HEAD query to verify connectivity and auth/session handling.
       const { error } = await supabase
-        .from('rooms')
+        .from('waypoints')
         .select('id', { head: true, count: 'exact' })
         .limit(1);
 
       if (!mountedRef.current) return;
-      setStatus(error ? 'disconnected' : 'connected');
+
+      if (error) {
+        // Supabase/PostgREST returns PGRST205 when a table is missing in schema cache.
+        if (error.code === 'PGRST205') {
+          schemaMissingRef.current = true;
+        }
+        setStatus('disconnected');
+      } else {
+        setStatus('connected');
+      }
     } catch {
       if (!mountedRef.current) return;
       setStatus('disconnected');
@@ -33,9 +43,11 @@ export function useDatabaseConnection(pollIntervalMs = 20000) {
 
   useEffect(() => {
     mountedRef.current = true;
+    schemaMissingRef.current = false;
     void checkConnection();
 
     const timer = window.setInterval(() => {
+      if (schemaMissingRef.current) return;
       void checkConnection();
     }, pollIntervalMs);
 
