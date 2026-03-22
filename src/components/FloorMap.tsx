@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Room, FloorType, NavigationResult } from '@/lib/types';
+import { Room, FloorType, NavigationResult, WaypointType } from '@/lib/types';
 import { navigationEngine } from '@/lib/navigation-engine';
 import { TransformComponent, TransformWrapper } from 'react-zoom-pan-pinch';
 import { MapPin } from 'lucide-react';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface FloorMapProps {
   floor: FloorType;
@@ -21,11 +22,10 @@ export const FloorMap: React.FC<FloorMapProps> = ({
   navigationResult,
   selectedSource,
   selectedDest,
-  userPosition,
+  userPosition: _userPosition,
 }) => {
   const [mapSize, setMapSize] = useState({ w: 800, h: 500 });
-
-  const floorRooms = useMemo(() => rooms.filter((r) => r.floor === floor), [rooms, floor]);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     if (!floorMapUrl) {
@@ -48,18 +48,22 @@ export const FloorMap: React.FC<FloorMapProps> = ({
   const destNode = selectedDest ? navigationEngine.getNode(selectedDest) : null;
   const hasRoute = Boolean(navigationResult && selectedSource && selectedDest);
 
-  const routeNodesOnFloor = useMemo(() => {
+  const routeGroupsOnFloor = useMemo(() => {
     if (!navigationResult) return [];
-    return navigationResult.path
-      .map((nodeId) => {
-        const node = navigationEngine.getNode(nodeId);
-        if (!node || node.floor !== floor) return null;
-        return { id: nodeId, x: node.x, y: node.y, type: node.type };
-      })
-      .filter((node): node is { id: string; x: number; y: number; type: string } => node !== null);
+    return navigationEngine.getRouteGroupsOnFloor(navigationResult.path, floor);
   }, [navigationResult, floor]);
 
-  const pathPoints = routeNodesOnFloor.map((node) => `${node.x},${node.y}`).join(' ');
+  const routeNodesOnFloor = useMemo(() => {
+    const nodeById = new Map<string, { id: string; x: number; y: number; type: WaypointType }>();
+    routeGroupsOnFloor.forEach((group) => {
+      group.forEach((node) => {
+        if (!nodeById.has(node.id)) {
+          nodeById.set(node.id, { id: node.id, x: node.x, y: node.y, type: node.type });
+        }
+      });
+    });
+    return Array.from(nodeById.values());
+  }, [routeGroupsOnFloor]);
 
   const midRouteDots = routeNodesOnFloor.filter((node) => (
     node.id !== selectedSource
@@ -68,26 +72,52 @@ export const FloorMap: React.FC<FloorMapProps> = ({
     && node.type !== 'block'
   ));
 
-  const activeFloorChangeMessage = useMemo(() => {
-    if (!navigationResult) return null;
-    const floorChangeStep = navigationResult.steps.find((step) => {
-      if (!step.isFloorChange) return false;
+  const floorTransitionMarkers = useMemo(() => {
+    if (!navigationResult) {
+      return [] as Array<{ id: string; x: number; y: number; kind: 'departure' | 'arrival' }>;
+    }
+
+    const markers: Array<{ id: string; x: number; y: number; kind: 'departure' | 'arrival' }> = [];
+
+    navigationResult.steps.forEach((step) => {
+      if (!step.isFloorChange) return;
+
       const fromNode = navigationEngine.getNode(step.fromNode);
-      return fromNode?.floor === floor;
+      const toNode = navigationEngine.getNode(step.toNode);
+      if (!fromNode || !toNode) return;
+
+      if (fromNode.floor === floor) {
+        markers.push({
+          id: `${step.fromNode}-${step.toNode}-from`,
+          x: fromNode.x,
+          y: fromNode.y,
+          kind: 'departure',
+        });
+      }
+
+      if (toNode.floor === floor) {
+        markers.push({
+          id: `${step.fromNode}-${step.toNode}-to`,
+          x: toNode.x,
+          y: toNode.y,
+          kind: 'arrival',
+        });
+      }
     });
-    return floorChangeStep?.instruction ?? null;
+
+    return markers;
   }, [navigationResult, floor]);
 
   return (
     <div className="relative h-full w-full overflow-hidden rounded-lg border border-border bg-card">
       <TransformWrapper
         key={`${floor}-${hasRoute ? 'routed' : 'idle'}`}
-        initialScale={hasRoute ? 1.8 : 1.4}
+        initialScale={isMobile ? (hasRoute ? 3.0 : 2.6) : (hasRoute ? 1.8 : 1.4)}
         minScale={0.4}
         maxScale={4}
         centerOnInit
         wheel={{ step: 0.12 }}
-        pinch={{ disabled: true }}
+        pinch={{ disabled: !isMobile }}
         doubleClick={{ disabled: true }}
         panning={{ velocityDisabled: true }}
       >
@@ -109,27 +139,55 @@ export const FloorMap: React.FC<FloorMapProps> = ({
               viewBox={`0 0 ${mapSize.w} ${mapSize.h}`}
               preserveAspectRatio="none"
             >
-              {hasRoute && routeNodesOnFloor.length > 1 && (
-                <>
-                  <polyline
-                    points={pathPoints}
-                    stroke="rgba(255,255,255,0.95)"
-                    strokeWidth="7"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    fill="none"
-                  />
-                  <polyline
-                    points={pathPoints}
-                    className="stroke-nav-path"
-                    strokeWidth="4"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    fill="none"
-                    strokeDasharray="9 6"
-                    style={{ animation: 'draw-path 0.9s ease-out' }}
-                  />
-                </>
+              {hasRoute && routeGroupsOnFloor.map((group, idx) => {
+                const groupPoints = group.map((node) => `${node.x},${node.y}`).join(' ');
+                return (
+                  <React.Fragment key={`route-group-${idx}`}>
+                    <polyline
+                      points={groupPoints}
+                      stroke="rgba(255,255,255,0.95)"
+                      strokeWidth="7"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      fill="none"
+                    />
+                    <polyline
+                      points={groupPoints}
+                      className="stroke-nav-path"
+                      strokeWidth="4"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      fill="none"
+                      strokeDasharray="9 6"
+                      style={{ animation: 'draw-path 0.9s ease-out' }}
+                    />
+                  </React.Fragment>
+                );
+              })}
+
+              {hasRoute && sourceNode && sourceNode.floor === floor && (
+                <g transform={`translate(${sourceNode.x}, ${sourceNode.y})`}>
+                  <circle r="6" fill="#10b981" stroke="white" strokeWidth="2" />
+                </g>
+              )}
+
+              {hasRoute && destNode && destNode.floor === floor && (
+                <g transform={`translate(${destNode.x}, ${destNode.y})`}>
+                  <circle r="6" fill="#ef4444" stroke="white" strokeWidth="2" />
+                </g>
+              )}
+
+              {hasRoute && destNode && destNode.floor === floor && (
+                <g transform={`translate(${destNode.x}, ${destNode.y})`}>
+                  <foreignObject x="-16" y="-32" width="32" height="32">
+                    <MapPin
+                      className="h-8 w-8 text-red-500"
+                      fill="#ef4444"
+                      stroke="#ffffff"
+                      strokeWidth={1.8}
+                    />
+                  </foreignObject>
+                </g>
               )}
 
               {hasRoute && midRouteDots.map((node) => (
@@ -142,48 +200,27 @@ export const FloorMap: React.FC<FloorMapProps> = ({
                   opacity="0.85"
                 />
               ))}
+
+              {hasRoute && floorTransitionMarkers.map((marker) => (
+                <g key={marker.id} transform={`translate(${marker.x}, ${marker.y})`}>
+                  <circle
+                    r="8"
+                    fill={marker.kind === 'arrival' ? '#3b82f6' : '#f59e0b'}
+                    stroke="white"
+                    strokeWidth="2"
+                    opacity="0.95"
+                  />
+                  <circle
+                    r="12"
+                    fill="none"
+                    stroke={marker.kind === 'arrival' ? '#3b82f6' : '#f59e0b'}
+                    strokeWidth="2"
+                    opacity="0.45"
+                  />
+                </g>
+              ))}
             </svg>
 
-            <div className="absolute inset-0">
-              {hasRoute && sourceNode && sourceNode.floor === floor && (
-                <div
-                  className="absolute"
-                  style={{ left: sourceNode.x, top: sourceNode.y, transform: 'translate(-50%, -100%)' }}
-                >
-                  <MapPin className="h-8 w-8 text-emerald-500 drop-shadow" fill="#10b981" stroke="#ffffff" strokeWidth={1.8} />
-                </div>
-              )}
-
-              {hasRoute && destNode && destNode.floor === floor && (
-                <div
-                  className="absolute"
-                  style={{ left: destNode.x, top: destNode.y, transform: 'translate(-50%, -100%)' }}
-                >
-                  <MapPin className="h-8 w-8 text-red-500 drop-shadow" fill="#ef4444" stroke="#ffffff" strokeWidth={1.8} />
-                </div>
-              )}
-
-              {userPosition && userPosition.floor === floor && (
-                <div
-                  className="absolute"
-                  style={{ left: userPosition.x, top: userPosition.y, transform: 'translate(-50%, -50%)' }}
-                >
-                  <div className="h-4 w-4 rounded-full bg-blue-500 ring-4 ring-blue-300/70 shadow-md animate-pulse" />
-                </div>
-              )}
-            </div>
-
-            {hasRoute && activeFloorChangeMessage && (
-              <div className="absolute left-3 top-3 rounded-md border border-amber-200 bg-amber-50/95 px-3 py-2 text-xs text-amber-900 shadow-sm">
-                {activeFloorChangeMessage}
-              </div>
-            )}
-
-            {!hasRoute && floorRooms.length > 0 && (
-              <div className="absolute left-3 top-3 rounded-md border border-border bg-card/95 px-3 py-2 text-xs text-muted-foreground shadow-sm">
-                Select source and destination, then tap Find Route.
-              </div>
-            )}
           </div>
         </TransformComponent>
       </TransformWrapper>

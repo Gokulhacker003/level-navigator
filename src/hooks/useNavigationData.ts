@@ -6,6 +6,12 @@ import { getRoomNodeId, SEED_EDGES, SEED_ROOMS, SEED_WAYPOINTS } from '../lib/se
 import { normalizeFloorMapUrl } from '@/lib/floor-map-url';
 
 const buildNameFloorKey = (name: string, floor: FloorType) => `${name}::${floor}`;
+const FLOOR_ORDER: FloorType[] = ['G', 'F', 'S', 'T'];
+
+const getConnectorBaseName = (name: string) => {
+  const stripped = name.replace(/[-_\s]?(G|F|S|T)$/i, '').trim().toLowerCase();
+  return stripped || name.trim().toLowerCase();
+};
 
 export function useNavigationData() {
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -128,18 +134,63 @@ export function useNavigationData() {
         return byName[0];
       };
 
-      // Add edges
-      loadedEdges.forEach(edge => {
-        const fromNode = edge.from_waypoint_id
-          ? edge.from_waypoint_id
-          : resolveLegacyNodeId(edge.from_node, edge.floor);
-        const toNode = edge.to_waypoint_id
-          ? edge.to_waypoint_id
-          : resolveLegacyNodeId(edge.to_node, edge.floor);
+      const resolveEdgeNodeId = (
+        preferredWaypointId: string | null | undefined,
+        legacyNode: string,
+        floor: FloorType | null
+      ): string | null => {
+        if (preferredWaypointId && waypointById.has(preferredWaypointId)) {
+          return preferredWaypointId;
+        }
+        return resolveLegacyNodeId(legacyNode, floor);
+      };
 
-        if (!fromNode || !toNode) return;
+      // Add edges
+      let resolvedEdgeCount = 0;
+      let unresolvedEdgeCount = 0;
+
+      loadedEdges.forEach((edge) => {
+        const fromNode = resolveEdgeNodeId(edge.from_waypoint_id, edge.from_node, edge.floor);
+        const toNode = resolveEdgeNodeId(edge.to_waypoint_id, edge.to_node, edge.floor);
+
+        if (!fromNode || !toNode) {
+          unresolvedEdgeCount += 1;
+          return;
+        }
+
+        resolvedEdgeCount += 1;
         navigationEngine.addEdge(fromNode, toNode, edge.distance);
       });
+
+      // Safety net for multi-floor continuity: connect matching stairs/lifts between adjacent floors.
+      const connectorGroups = new Map<string, Waypoint[]>();
+      loadedWaypoints
+        .filter((wp) => wp.type === 'stairs' || wp.type === 'lift')
+        .forEach((wp) => {
+          const key = `${wp.type}::${getConnectorBaseName(wp.name)}`;
+          const group = connectorGroups.get(key) ?? [];
+          group.push(wp);
+          connectorGroups.set(key, group);
+        });
+
+      connectorGroups.forEach((group) => {
+        const sorted = [...group].sort(
+          (a, b) => FLOOR_ORDER.indexOf(a.floor) - FLOOR_ORDER.indexOf(b.floor)
+        );
+
+        for (let i = 0; i < sorted.length - 1; i += 1) {
+          const from = sorted[i];
+          const to = sorted[i + 1];
+          const distance = from.type === 'lift' ? 7 : 9;
+          navigationEngine.addEdge(from.id, to.id, distance);
+        }
+      });
+
+      if (unresolvedEdgeCount > 0) {
+        console.warn(
+          `[navigation] ${unresolvedEdgeCount} edges could not be resolved and were skipped. ${resolvedEdgeCount} edges were loaded.`
+        );
+      }
     } catch (err) {
       console.error('Failed to load navigation data:', err);
     }

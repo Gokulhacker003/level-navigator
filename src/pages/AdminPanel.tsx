@@ -28,6 +28,7 @@ type MarkerPercent = {
 type ManagedWaypoint = {
   id: string;
   name: string;
+  room_id: string | null;
   floor: FloorType;
   block: string;
   type: WaypointType;
@@ -55,6 +56,7 @@ const AdminPanel = () => {
   const [authLoading, setAuthLoading] = useState(true);
 
   const [waypointName, setWaypointName] = useState('');
+  const [waypointRoomId, setWaypointRoomId] = useState('');
   const [waypointFloor, setWaypointFloor] = useState<FloorType>('G');
   const [waypointBlock, setWaypointBlock] = useState('A');
   const [waypointType, setWaypointType] = useState<WaypointType>('corridor');
@@ -96,7 +98,7 @@ const AdminPanel = () => {
     setManageLoading(true);
     try {
       const [waypointsRes, edgesRes] = await Promise.all([
-        supabase.from('waypoints').select('id,name,floor,block,type,x,y').order('floor', { ascending: true }).order('name', { ascending: true }).limit(200),
+        supabase.from('waypoints').select('id,name,room_id,floor,block,type,x,y').order('floor', { ascending: true }).order('name', { ascending: true }).limit(200),
         supabase.from('graph_edges').select('id,from_node,to_node,from_waypoint_id,to_waypoint_id,distance,floor,is_vertical').order('from_node', { ascending: true }).order('to_node', { ascending: true }).limit(200),
       ]);
 
@@ -263,8 +265,14 @@ const AdminPanel = () => {
   }, [selectedCurrentNode, selectedNextNode, selectedPreviousNode, toast]);
 
   const handleEdgeMapMarkerClick = useCallback((nodeId: string) => {
+    if (!selectedCurrentNode && selectionMode !== 'current') {
+      applyNodeSelection('current', nodeId);
+      setSelectionMode('next');
+      return;
+    }
+
     applyNodeSelection(selectionMode, nodeId);
-  }, [applyNodeSelection, selectionMode]);
+  }, [applyNodeSelection, selectedCurrentNode, selectionMode]);
 
   const handleEdgeMapLoad = () => {
     const image = edgeMapImgRef.current;
@@ -341,8 +349,14 @@ const AdminPanel = () => {
         throw new Error('X and Y must be valid numbers.');
       }
 
+      const normalizedRoomId = waypointRoomId.trim().toUpperCase();
+      if (waypointType === 'room' && !normalizedRoomId) {
+        throw new Error('Room ID is required when waypoint type is room.');
+      }
+
       const payload = {
         name: waypointName.trim(),
+        room_id: waypointType === 'room' ? normalizedRoomId : null,
         floor: waypointFloor,
         block: blockValue,
         type: waypointType,
@@ -351,23 +365,31 @@ const AdminPanel = () => {
       };
 
       const { error } = editingWaypointId
-        ? await supabase.from('waypoints').update(payload).eq('id', editingWaypointId)
-        : await supabase.from('waypoints').insert(payload);
+        ? await supabase.from('waypoints').update(payload as never).eq('id', editingWaypointId)
+        : await supabase.from('waypoints').upsert(payload as never, { onConflict: 'name,floor' });
 
       if (error) throw error;
 
       toast({
-        title: editingWaypointId ? 'Waypoint updated' : 'Waypoint added',
-        description: editingWaypointId ? 'Waypoint updated successfully.' : 'Waypoint inserted successfully.',
+        title: editingWaypointId ? 'Waypoint updated' : 'Waypoint saved',
+        description: editingWaypointId
+          ? 'Waypoint updated successfully.'
+          : 'Waypoint inserted or updated successfully for this floor/name.',
       });
       setEditingWaypointId(null);
       setWaypointName('');
+      setWaypointRoomId('');
       setWaypointX('');
       setWaypointY('');
       setWaypointMarkerPercent(null);
       await loadManageData();
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Failed to save waypoint.';
+      const postgrestError = error as { code?: string; message?: string; details?: string };
+      const message = postgrestError.code === '23505'
+        ? 'Duplicate waypoint conflict. Use a different room ID/name or edit the existing row.'
+        : error instanceof Error
+          ? error.message
+          : 'Failed to save waypoint.';
       toast({ title: 'Waypoint save failed', description: message, variant: 'destructive' });
     } finally {
       setWaypointLoading(false);
@@ -577,6 +599,7 @@ const AdminPanel = () => {
   const handleEditWaypoint = (wp: ManagedWaypoint) => {
     setEditingWaypointId(wp.id);
     setWaypointName(wp.name);
+    setWaypointRoomId(wp.room_id ?? '');
     setWaypointFloor(wp.floor);
     setWaypointBlock(wp.block);
     setWaypointType(wp.type);
@@ -589,6 +612,7 @@ const AdminPanel = () => {
   const cancelWaypointEdit = () => {
     setEditingWaypointId(null);
     setWaypointName('');
+    setWaypointRoomId('');
     setWaypointFloor('G');
     setWaypointBlock('A');
     setWaypointType('corridor');
@@ -677,6 +701,17 @@ const AdminPanel = () => {
               <div className="space-y-2 md:col-span-2">
                 <Label htmlFor="wp-name">Name</Label>
                 <Input id="wp-name" value={waypointName} onChange={(e) => setWaypointName(e.target.value)} required />
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="wp-room-id">Room ID</Label>
+                <Input
+                  id="wp-room-id"
+                  value={waypointRoomId}
+                  onChange={(e) => setWaypointRoomId(e.target.value.toUpperCase())}
+                  placeholder="AG101"
+                  required={waypointType === 'room'}
+                />
+                <p className="text-xs text-muted-foreground">Required for room type. Example: AG101</p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="wp-floor">Floor</Label>
@@ -783,6 +818,11 @@ const AdminPanel = () => {
                   required
                 >
                   <option value="">Select current node</option>
+                  {selectedCurrentNode && !edgeSelectableWaypoints.some((wp) => wp.id === selectedCurrentNode) && waypointById.get(selectedCurrentNode) && (
+                    <option value={selectedCurrentNode}>
+                      {waypointById.get(selectedCurrentNode)?.name} (ID: {selectedCurrentNode}) - {waypointById.get(selectedCurrentNode)?.floor} [selected]
+                    </option>
+                  )}
                   {edgeSelectableWaypoints.map((wp) => (
                     <option key={wp.id} value={wp.id}>
                       {wp.name} (ID: {wp.id})
@@ -800,6 +840,11 @@ const AdminPanel = () => {
                   required
                 >
                   <option value="">Select next node</option>
+                  {selectedNextNode && !edgeSelectableWaypoints.some((wp) => wp.id === selectedNextNode) && waypointById.get(selectedNextNode) && (
+                    <option value={selectedNextNode}>
+                      {waypointById.get(selectedNextNode)?.name} (ID: {selectedNextNode}) - {waypointById.get(selectedNextNode)?.floor} [selected]
+                    </option>
+                  )}
                   {edgeSelectableWaypoints.map((wp) => (
                     <option key={wp.id} value={wp.id}>
                       {wp.name} (ID: {wp.id})
@@ -816,6 +861,11 @@ const AdminPanel = () => {
                   onChange={(e) => applyNodeSelection('previous', e.target.value || null)}
                 >
                   <option value="">None</option>
+                  {selectedPreviousNode && !edgeSelectableWaypoints.some((wp) => wp.id === selectedPreviousNode) && waypointById.get(selectedPreviousNode) && (
+                    <option value={selectedPreviousNode}>
+                      {waypointById.get(selectedPreviousNode)?.name} (ID: {selectedPreviousNode}) - {waypointById.get(selectedPreviousNode)?.floor} [selected]
+                    </option>
+                  )}
                   {edgeSelectableWaypoints.map((wp) => (
                     <option key={wp.id} value={wp.id}>
                       {wp.name} (ID: {wp.id})
@@ -905,6 +955,7 @@ const AdminPanel = () => {
                   <Label htmlFor="edge-filter-map-floor">Filter node dropdowns by map floor</Label>
                 </div>
                 <p className="text-xs text-muted-foreground">Click a marker to assign it to the active role (Current/Next/Previous).</p>
+                <p className="text-xs text-muted-foreground">Selected nodes are preserved when you change Map Floor, so you can connect Ground floor to upper floors.</p>
                 <div className="relative inline-block border rounded-md overflow-hidden bg-muted/20">
                   <img
                     ref={edgeMapImgRef}
@@ -1071,6 +1122,7 @@ const AdminPanel = () => {
                 <thead className="bg-muted/50">
                   <tr>
                     <th className="text-left p-2">Name</th>
+                    <th className="text-left p-2">Room ID</th>
                     <th className="text-left p-2">Floor</th>
                     <th className="text-left p-2">Type</th>
                     <th className="text-left p-2">Block</th>
@@ -1083,6 +1135,7 @@ const AdminPanel = () => {
                   {waypointRows.map((wp) => (
                     <tr key={wp.id} className="border-t">
                       <td className="p-2">{wp.name}</td>
+                      <td className="p-2">{wp.room_id ?? '-'}</td>
                       <td className="p-2">{wp.floor}</td>
                       <td className="p-2">{wp.type}</td>
                       <td className="p-2">{wp.block}</td>

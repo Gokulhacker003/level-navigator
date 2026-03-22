@@ -638,8 +638,3 @@ To be inserted by project team:
 To be inserted by project team:
 - Route result screenshot (path, distance, step list)
 - Floor map overlay screenshot for one complete route
-
-
-
-
-
