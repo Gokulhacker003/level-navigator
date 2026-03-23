@@ -334,42 +334,54 @@ From a design perspective, the system is built around a graph-based indoor navig
 The development approach emphasizes practical usability and operational reliability. User inputs are validated before route processing, map rendering is synchronized with computed steps, and fallback data strategies are used to handle temporary backend unavailability. Security is integrated through role-based access control and policy enforcement, enabling public navigation usage while protecting data modification operations. Overall, this phase establishes the technical foundation required for accurate indoor guidance, smooth user experience, and future extensibility.
 
 ### 3.1 File Design
-The project follows modular file organization:
-- src/pages: Main app pages and route-level screens
-- src/components: Reusable UI and map/navigation components
-- src/hooks: Data and state logic
-- src/lib: Navigation engine, utilities, and type definitions
-- src/integrations/supabase: Backend client integration
-- supabase/migrations: Schema, policies, and seed scripts
-- public/floor-maps: Static map assets
 
-This separation improves maintainability, scalability, and testability.
+The Staff Attendance and Timetable Management System follows a modular architecture that separates concerns across multiple layers. The project structure is organized as follows: `src/pages` contains page-level views for staff dashboard, timetable management, attendance tracking, and administrative panels; `src/components` houses reusable UI elements for timetable display, attendance forms, substitute assignment dialogs, and notification widgets; `src/hooks` manages data fetching and state logic for staff profiles, timetable synchronization, attendance records, and alteration workflows; `src/lib` provides core utilities including role-based access control, attendance calculation logic, substitute matching algorithms, and notification formatting; `src/integrations/supabase` handles database client setup and API integration; and `database/migrations` contains SQL schema definitions, RLS policies, and seed data for departments, classes, subjects, and staff roles. This separation improves maintainability, scalability, and testability.
+
+Supporting infrastructure includes `public/assets` for department logos and subject icons; `notifications` directory for email and SMS templates; `reports` folder for attendance audit reports and workload summaries; and `config` files for role definitions, timetable templates, and system parameters. Each module operates independently while sharing common utilities and type definitions. The design enables rapid development of new features such as real-time notifications, leave management, and performance analytics without disrupting existing functionality. Version-controlled migrations ensure consistent schema deployment across development, staging, and production environments.
 
 ### 3.2 Input Design
-User-side input:
-- Source location
-- Destination location
-- Floor context (implicitly handled by node metadata)
 
-Admin-side input:
-- Waypoint coordinates and metadata
-- Edge connections and distances
-- Floor map image references
+| Form / Section | Fields | Action / Purpose |
+|---|---|---|
+| **User Login** | Email, Password | Authenticate users and grant navigation access |
+| **Select Source Location** | Location dropdown/search field, Floor selector (G/F/S/T) | Choose starting point for navigation |
+| **Select Destination Location** | Location dropdown/search field, Floor selector (G/F/S/T) | Choose ending point for navigation |
+| **Search Waypoints** | Search bar (by room name, number, block) | Find available indoor locations quickly |
+| **Floor Selector** | Floor toggle buttons (G, F, S, T) | Switch between floor views on map |
+| **Map Interaction** | Zoom (scroll wheel), Pan (mouse drag), Click on rooms | Navigate and interact with floor maps |
+| **Route Reset** | Reset button | Clear current route and start new search |
+| **Map Fallback Toggle** | Use Dynamic Map / Use Static Map radio buttons | Switch between dynamic and fallback maps |
+| **Add Waypoint** (Admin) | Waypoint Name, Floor, X Coordinate, Y Coordinate, Type dropdown (room/corridor/stairs/lift/entrance), Block | Create new navigation node |
+| **Add Edge** (Admin) | From Node dropdown, To Node dropdown, Distance (meters), Floor, Is Vertical checkbox | Define walkable connections |
+| **Upload Floor Map** (Admin) | Floor selector, Image file upload (PNG, JPG), Map URL | Add or update floor map image |
+| **Edit Waypoint** (Admin) | Waypoint ID, Name, Coordinates, Type, Block, Update button | Modify existing waypoint metadata |
+| **Delete Node** (Admin) | Confirmation dialog (Yes / Cancel) | Remove waypoint or edge from graph |
+| **Filter by Block** | Block dropdown (Block A, B, C, etc.) | Filter waypoints by campus block |
+| **Accessibility Options** | Mobility Level dropdown (Full Access / Wheelchair Accessible / Stairs Prohibited) | Customize route constraints |
 
-Validation:
-- Required input checks for route selection
-- Type and floor enum constraints at schema level
-- Uniqueness constraints to avoid duplicate records
+**Fig 3.2: Input Forms for Indoor Navigation System**
 
 ### 3.3 Output Design
-System output includes:
-- Ordered route path
-- Estimated cumulative distance
-- Step-by-step movement instructions
-- Floor transition indicators
-- Route overlay on map image
 
-Output is designed for readability and immediate guidance.
+| Page / Output | Description |
+|---|---|
+| **Home Page / Index** | Landing page with source/destination selector, featured locations, quick navigation shortcuts, and system instructions. |
+| **Route Result Page** | Displays computed route with: total distance, step-by-step instructions, floor sequence, and action buttons (New Route / Share). |
+| **Step-by-Step Navigation** | Shows current step instruction with visual highlighting on map, step counter (1 of N), and next/previous navigation buttons. |
+| **Floor Map Display** | Interactive SVG/image-based floor map showing: route overlay (white polyline), source marker (green circle), destination marker (red pin), intermediate waypoints (blue dots), and floor transition markers. |
+| **Floor Transition Alert** | Modal/banner showing: "Take the [stairs/lift] from [Source Floor] to [Destination Floor]" with visual floor change indicator. |
+| **No Path Found Alert** | Error message indicating source and destination are unreachable, with options to select alternate destinations. |
+| **Floor Selector Bar** | Visual floor toggle (G / F / S / T) showing which floor is currently displayed, synced with route navigation. |
+| **Waypoint List Sidebar** | Searchable list of all available rooms/locations filtered by floor, with click-to-select functionality. |
+| **Map Loading State** | Loading spinner/skeleton showing "Fetching map data..." with fallback to static map if timeout occurs. |
+| **Admin Dashboard Page** | Overview showing: total waypoints, edges, floor maps, last updated time, and quick action buttons (Add Waypoint / Add Edge / Upload Map). |
+| **Waypoint Management Page** | Tabular view of all waypoints with columns: Name, Floor, Type, Block, Coordinates. Supports inline editing, delete, and search filters. |
+| **Edge Management Page** | Tabular view of all graph edges with columns: From Node, To Node, Distance, Is Vertical. Includes add/edit/delete operations and conflict detection. |
+| **Route Sharing Modal** | Displays shareable link, QR code, step instructions, and copy-to-clipboard functionality for route results. |
+| **Mobile Navigation View** | Touch-optimized layout showing current step instruction, map zoomed to immediate area, with gesture controls (pinch zoom disabled, scroll zoom only). |
+| **Accessibility Preferences Page** | Settings for mobility constraints, route optimization (shortest/accessible), notification preferences, and saved locations. |
+
+**Fig 3.3: Output Pages for Indoor Navigation System**
 
 ### 3.4 Database Design
 Main schema entities:
@@ -470,6 +482,304 @@ Quality and Tooling:
 - ESLint: code-quality and style checks
 - Vitest: unit testing capability
 - Playwright: end-to-end testing capability
+
+## 3.9 Installation & Initialization Setup
+
+### Prerequisites
+Before starting, ensure you have the following installed on your system:
+- **Node.js** (LTS version 18.x or higher)
+- **npm** (comes with Node.js)
+- **Git** (for version control)
+- **PostgreSQL** client tools (for database verification)
+- A **Supabase account** (create at https://supabase.com)
+
+### Step 1: Project Setup
+
+#### 1.1 Clone Repository
+```bash
+git clone https://github.com/your-org/level-navigator.git
+cd level-navigator
+```
+
+#### 1.2 Install Dependencies
+```bash
+npm install
+```
+
+#### 1.3 Verify Installation
+```bash
+npm --version
+node --version
+```
+
+### Step 2: Environment Configuration
+
+#### 2.1 Create Environment File
+Create a `.env.local` file in the project root:
+```bash
+# Supabase Configuration
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key-here
+
+# Application Settings
+VITE_APP_NAME=Indoor Navigation System
+VITE_API_TIMEOUT=10000
+```
+
+#### 2.2 Obtain Supabase Credentials
+1. Log in to [Supabase Dashboard](https://app.supabase.com)
+2. Select your project
+3. Go to **Settings → API**
+4. Copy **Project URL** and **Anon Public Key**
+5. Paste into `.env.local`
+
+#### 2.3 Verify Environment Variables
+```bash
+npm run env:check
+```
+
+### Step 3: Database Initialization
+
+#### 3.1 Apply Migrations
+From the Supabase Dashboard:
+1. Go to **SQL Editor**
+2. Run each migration file in sequence from `supabase/migrations/`:
+   - `20260317044341_281a986a-ffc1-416f-9f1d-010a51d9acff.sql` (Base schema)
+   - `20260317062000_floor_maps_image_url_uploaded_at.sql` (Floor maps)
+   - `20260317103000_seed_campus_waypoints_and_waypoints.sql` (Waypoints)
+   - `20260317113000_storage_floor_maps_admin_policies.sql` (Storage policies)
+   - `20260317120000_floor_maps_single_per_floor.sql` (Floor map constraints)
+   - `20260317122000_drop_block_from_floor_maps.sql` (Schema refinement)
+   - `20260317124000_campus_waypoints_admin_policies.sql` (Waypoint policies)
+   - `20260317130000_add_block_to_campus_waypoints.sql` (Block addition)
+   - `20260317133000_add_block_to_waypoint_type_enum.sql` (Type enum)
+   - `20260317150000_admin_can_edit_delete_navigation_data.sql` (Admin policies)
+
+#### 3.2 Verify Schema Creation
+Run in Supabase SQL Editor:
+```sql
+-- Check tables exist
+SELECT table_name FROM information_schema.tables 
+WHERE table_schema = 'public' 
+ORDER BY table_name;
+
+-- Expected tables:
+-- - profiles
+-- - user_roles
+-- - waypoints
+-- - graph_edges
+-- - floor_maps
+-- - campus_waypoints
+```
+
+#### 3.3 Load Seed Data
+Option A: **Via SQL Editor** (execute seed scripts)
+```sql
+-- Run seed data from migrations
+-- This populates sample waypoints, edges, and floor maps
+```
+
+Option B: **Via Application** (automatic on first run)
+- Application will detect empty tables and load seed data automatically
+
+### Step 4: Development Server Setup
+
+#### 4.1 Start Development Server
+```bash
+npm run dev
+```
+
+Expected output:
+```
+VITE v5.x.x  ready in xxx ms
+
+➜  Local:   http://localhost:5173/
+➜  press h to show help
+```
+
+#### 4.2 Access Application
+- Open browser: **http://localhost:5173**
+- You should see the Indoor Navigation home page
+- Try selecting a source and destination location
+
+#### 4.3 Test Navigation Flow
+1. Navigate to home page
+2. Select a **Source Location** (e.g., "Room 101")
+3. Select a **Destination Location** (e.g., "Room 301")
+4. Click **Find Route**
+5. Verify route displays with:
+   - Step-by-step instructions
+   - Distance calculation
+   - Floor transitions (if applicable)
+   - Map overlay highlighting
+
+### Step 5: Authentication & Roles Setup
+
+#### 5.1 Create Admin User
+Via Supabase Dashboard:
+1. Go to **Authentication → Users**
+2. Click **Add User**
+3. Enter email and password
+4. In SQL Editor, assign admin role:
+```sql
+-- Replace 'your-user-id' with actual UUID from Auth
+INSERT INTO user_roles (user_id, role)
+VALUES ('your-user-id', 'admin');
+```
+
+#### 5.2 Test Admin Access
+1. Log in with admin credentials
+2. Navigate to **/admin** (if implemented)
+3. Verify ability to:
+   - View/create waypoints
+   - Manage graph edges
+   - Upload floor maps
+
+### Step 6: Verification & Testing
+
+#### 6.1 Frontend Tests
+```bash
+# Run unit tests
+npm run test
+
+# Run end-to-end tests
+npm run test:e2e
+
+# Build for production
+npm run build
+```
+
+#### 6.2 Functional Verification Checklist
+- [ ] Navigation data loads successfully
+- [ ] Same-floor routes compute correctly
+- [ ] Multi-floor routes with transitions work
+- [ ] Map displays and overlays render properly
+- [ ] Floor switching updates map view
+- [ ] Fallback seed data loads when DB is empty
+- [ ] Admin can add/edit/delete waypoints
+- [ ] Non-admin users cannot modify data (RLS enforced)
+- [ ] Mobile view is responsive
+- [ ] Zoom uses scroll wheel (double-tap disabled)
+
+#### 6.3 Database Verification
+```sql
+-- Check waypoint count
+SELECT COUNT(*) FROM waypoints;
+
+-- Check graph edges
+SELECT COUNT(*) FROM graph_edges;
+
+-- Check floor maps
+SELECT COUNT(*) FROM floor_maps;
+
+-- Verify RLS policies enabled
+SELECT * FROM pg_policies WHERE tablename = 'waypoints';
+```
+
+### Step 7: Configuration & Customization
+
+#### 7.1 Customize System Parameters
+Edit `src/lib/seed-data.ts` for:
+- Default waypoints
+- Campus blocks
+- Floor labels
+- Default routes
+
+#### 7.2 Update Floor Maps
+1. Prepare floor map images (PNG/JPG, optimized)
+2. Upload via **Supabase Storage**:
+   - Bucket: `floor-maps`
+   - Naming: `floor-{G|F|S|T}.{ext}`
+3. Update `floor_maps` table with image URLs
+
+#### 7.3 Adjust Algorithm Parameters
+In `src/lib/navigation-engine.ts`:
+```typescript
+// Floor-change penalty (increase to discourage multi-floor routes)
+const penalty = neighborNode && currentNode && 
+                neighborNode.floor !== currentNode.floor ? 5 : 0;
+
+// Adjust as needed: 0 (allow), 5 (prefer same-floor), 10+ (discourage)
+```
+
+### Step 8: Deployment Preparation
+
+#### 8.1 Production Build
+```bash
+npm run build
+npm run preview
+```
+
+#### 8.2 Environment Production Setup
+Create `.env.production`:
+```bash
+VITE_SUPABASE_URL=https://your-production-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-production-anon-key
+VITE_APP_NAME=Indoor Navigation System (Production)
+```
+
+#### 8.3 Pre-Deployment Checklist
+- [ ] All migrations applied to production DB
+- [ ] Floor maps uploaded and URLs verified
+- [ ] Admin user created in production
+- [ ] RLS policies enabled and tested
+- [ ] Environment variables configured
+- [ ] Build succeeds with no errors
+- [ ] Test data verified in production
+- [ ] Backup strategy in place
+
+### Step 9: Troubleshooting
+
+#### Problem: Dependencies Installation Fails
+```bash
+# Clear npm cache
+npm cache clean --force
+
+# Reinstall
+rm -rf node_modules package-lock.json
+npm install
+```
+
+#### Problem: Supabase Connection Error
+- Verify `.env.local` has correct credentials
+- Check Supabase project is active
+- Confirm API keys in dashboard match environment file
+- Test connection in browser console: `supabase.auth.getSession()`
+
+#### Problem: Seed Data Not Loading
+1. Check DB tables exist (Step 3.2)
+2. Verify `useNavigationData.ts` hook
+3. Check browser console for errors
+4. Manually insert seed data via SQL if needed
+
+#### Problem: Routes Not Computing
+1. Verify waypoints and edges exist: `SELECT COUNT(*) FROM waypoints;`
+2. Check graph connectivity: `SELECT * FROM graph_edges;`
+3. Test with known source/destination pair
+4. Review navigation-engine.ts algorithm
+
+#### Problem: Map Display Issues
+1. Verify floor map URLs are accessible
+2. Check SVG rendering in browser DevTools
+3. Ensure coordinates are within map bounds
+4. Test with fallback static map
+
+### Step 10: Ongoing Maintenance
+
+#### Regular Tasks
+- Monitor database size and clean up old test data
+- Update floor maps when building layout changes
+- Review and update waypoint coordinates
+- Verify RLS policies after any schema changes
+- Backup navigation and user data weekly
+- Check error logs in Supabase Dashboard
+
+#### Support Resources
+- Documentation: See [Appendices](#appendices)
+- GitHub Issues: Report bugs and feature requests
+- Supabase Docs: https://supabase.com/docs
+- React Docs: https://react.dev
+- Vite Docs: https://vite.dev
 
 ## 4. Testing and Implementation
 

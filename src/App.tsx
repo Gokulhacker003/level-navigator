@@ -27,6 +27,7 @@ const App = () => (
           <Route path={ADMIN_LOGIN_PATH} element={<AdminLogin />} />
           <Route path={ADMIN_PANEL_PATH} element={<AdminPanel />} />
           <Route path="/docs" element={<Documentation />} />
+          <Route path="/admin" element={<AdminPanel />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
